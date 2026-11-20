@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="220" viewBox="0 0 480 220">
+<rect width="480" height="220" fill="#090909"/>
+<rect x="31" y="21" width="64" height="144" fill="#161616"/>
+<rect x="95" y="21" width="77" height="144" fill="#1d1d1d"/>
+<rect x="172" y="21" width="84" height="144" fill="#161616"/>
+<rect x="256" y="21" width="76" height="144" fill="#1d1d1d"/>
+<rect x="332" y="21" width="84" height="144" fill="#161616"/>
+<rect x="416" y="21" width="33" height="144" fill="#1d1d1d"/>
+<path id="grid0" d="M31 21H449" stroke="#494949" stroke-width="1" fill="none"/>
+<text transform="matrix(1 0 0 1 26 24)" text-anchor="end" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">+12</text>
+<text transform="matrix(1 0 0 1 26 72)" text-anchor="end" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">0</text>
+<path id="grid24" d="M31 117H449" stroke="#494949" stroke-width="1" fill="none"/>
+<text transform="matrix(1 0 0 1 26 120)" text-anchor="end" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">-12</text>
+<path id="grid36" d="M31 165H449" stroke="#494949" stroke-width="1" fill="none"/>
+<text transform="matrix(1 0 0 1 26 168)" text-anchor="end" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">-24</text>
+<text transform="matrix(1 0 0 1 26 12)" text-anchor="end" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">dB</text>
+<text transform="matrix(1 0 0 1 449 179)" text-anchor="end" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">Hz</text>
+<text transform="matrix(1 0 0 1 95 179)" text-anchor="middle" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">100</text>
+<text transform="matrix(1 0 0 1 172 179)" text-anchor="middle" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">300</text>
+<text transform="matrix(1 0 0 1 256 179)" text-anchor="middle" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">1k</text>
+<text transform="matrix(1 0 0 1 332 179)" text-anchor="middle" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">3k</text>
+<text transform="matrix(1 0 0 1 416 179)" text-anchor="middle" font-family="UniversNextPro-Light" font-size="9px" fill="#a8a8a8">10k</text>
+<path id="fillcurve" d="M31 168 L31 70 L44 70 L57 70 L70 70 L79 70 L84 70 L96 70 L109 70 L122 70 L128 70 L136 70 L149 70 L162 70 L175 70 L176 70 L188 70 L201 70 L214 70 L224 70 L227 70 L240 70 L253 70 L266 70 L271 70 L279 70 L292 70 L305 70 L318 70 L319 70 L331 70 L345 70 L358 70 L371 70 L384 70 L397 70 L401 70 L410 70 L423 70 L436 70 L449 70 L449 168 Z" fill="#242424"/>
+<path id="zero" d="M31 69H35 M41 69H45 M51 69H55 M61 69H65 M71 69H75 M81 69H85 M91 69H95 M101 69H105 M111 69H115 M121 69H125 M131 69H135 M141 69H145 M151 69H155 M161 69H165 M171 69H175 M181 69H185 M191 69H195 M201 69H205 M211 69H215 M221 69H225 M231 69H235 M241 69H245 M251 69H255 M261 69H265 M271 69H275 M281 69H285 M291 69H295 M301 69H305 M311 69H315 M321 69H325 M331 69H335 M341 69H345 M351 69H355 M361 69H365 M371 69H375 M381 69H385 M391 69H395 M401 69H405 M411 69H415 M421 69H425 M431 69H435 M441 69H445" stroke="#777777" stroke-width="1" fill="none"/>
+<path id="secondary" d="M31 68 L44 68 L57 68 L70 68 L79 68 L84 68 L96 68 L109 68 L122 68 L128 68 L136 68 L149 68 L162 68 L175 68 L176 68 L188 68 L201 68 L214 68 L224 68 L227 68 L240 68 L253 68 L266 68 L271 68 L279 68 L292 68 L305 68 L318 68 L319 68 L331 68 L345 68 L358 68 L371 68 L384 68 L397 68 L401 68 L410 68 L423 68 L436 68 L449 68 L449 69 L436 69 L423 69 L410 69 L401 69 L397 69 L384 69 L371 69 L358 69 L345 69 L331 69 L319 69 L318 69 L305 69 L292 69 L279 69 L271 69 L266 69 L253 69 L240 69 L227 69 L224 69 L214 69 L201 69 L188 69 L176 69 L175 69 L162 69 L149 69 L136 69 L128 69 L122 69 L109 69 L96 69 L84 69 L79 69 L70 69 L57 69 L44 69 L31 69 Z" fill="#999999" transform="matrix(1 0 0 1 -480 0)"/>
+<path id="curve" d="M31 68 L44 68 L57 68 L70 68 L79 68 L84 68 L96 68 L109 68 L122 68 L128 68 L136 68 L149 68 L162 68 L175 68 L176 68 L188 68 L201 68 L214 68 L224 68 L227 68 L240 68 L253 68 L266 68 L271 68 L279 68 L292 68 L305 68 L318 68 L319 68 L331 68 L345 68 L358 68 L371 68 L384 68 L397 68 L401 68 L410 68 L423 68 L436 68 L449 68 L449 70 L436 70 L423 70 L410 70 L401 70 L397 70 L384 70 L371 70 L358 70 L345 70 L331 70 L319 70 L318 70 L305 70 L292 70 L279 70 L271 70 L266 70 L253 70 L240 70 L227 70 L224 70 L214 70 L201 70 L188 70 L176 70 L175 70 L162 70 L149 70 L136 70 L128 70 L122 70 L109 70 L96 70 L84 70 L79 70 L70 70 L57 70 L44 70 L31 70 Z" fill="#eeeeee"/>
+<path id="dot0" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="dot1" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="dot2" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="dot3" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="dot4" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="dot5" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="dot6" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" stroke="#aaaaaa" stroke-width="0.8"/>
+<path id="sweep_dot" d="M-2.5 0Q-2.5 -2.5 0 -2.5Q2.5 -2.5 2.5 0Q2.5 2.5 0 2.5Q-2.5 2.5 -2.5 0Z" fill="#ff4949" transform="matrix(1 0 0 1 22 197)"/>
+<path id="rail" d="M190 197H425 M190 194V200 M307 194V200 M425 194V200" fill="none" stroke="#777777" stroke-width="1.5"/>
+<path id="handle" d="M-4 0Q-4 -4 0 -4Q4 -4 4 0Q4 4 0 4Q-4 4 -4 0Z" fill="#eeeeee"/>
+<path id="icon0" d="M-15 -1H-10L-5 -7H5L10 -1H15V1H10L5 7H-5L-10 1H-15Z M-7 -1H7L4 -4H-4Z M-7 1L-4 4H4L7 1Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 47 197)"/>
+<path id="icon1" d="M-11 8L0 -10L11 8Z M-7 5H7L0 -5Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 -480 197)"/>
+<path id="icon2" d="M-9 -8L-7 -6Q-15 0 -7 6L-9 8Q-19 0 -9 -8Z M9 -8Q19 0 9 8L7 6Q15 0 7 -6Z M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 -480 197)"/>
+<path id="icon3" d="M-9 -1H-6V-3H-2V-1H2V-3H6V-1H9V1H6V3H2V1H-2V3H-6V1H-9Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 168 197)"/>
+<path id="icon4" d="M-9 -1H-6L-3 -5H3L6 -1H9V1H6L3 5H-3L-6 1H-9Z M-4 0L-2 3H2L4 0L2 -3H-2Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 449 197)"/>
+<path id="icon5" d="M-9 1H-5Q0 -7 5 1H9V3H4Q0 -3 -4 3H-9Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 -480 197)"/>
+<path id="icon6" d="M-11 8L0 -10L11 8Z M-7 5H7L0 -5Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 -480 197)"/>
+<path id="icon7" d="M-3 0Q-3 -3 0 -3Q3 -3 3 0Q3 3 0 3Q-3 3 -3 0Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 -480 197)"/>
+<path id="icon8" d="M-9 -8L-7 -6Q-15 0 -7 6L-9 8Q-19 0 -9 -8Z M9 -8Q19 0 9 8L7 6Q15 0 7 -6Z" fill="#eeeeee" fill-rule="evenodd" transform="matrix(1 0 0 1 -480 197)"/>
+<path id="shade0" d="M-8 -8h1v1z" fill="#4c4c4c"/>
+<path id="shade1" d="M-8 -8h1v1z" fill="#525252"/>
+<path id="shade2" d="M-8 -8h1v1z" fill="#5e5e5e"/>
+<path id="shade3" d="M-8 -8h1v1z" fill="#6e6e6e"/>
+<path id="shade4" d="M-8 -8h1v1z" fill="#828282"/>
+<path id="shade5" d="M-8 -8h1v1z" fill="#999999"/>
+<path id="shade6" d="M-8 -8h1v1z" fill="#b4b4b4"/>
+<path id="shade7" d="M-8 -8h1v1z" fill="#d0d0d0"/>
+<path id="shade8" d="M-8 -8h1v1z" fill="#f0f0f0"/>
+<path id="shade9" d="M-8 -8h1v1z" fill="#090909"/>
+<path id="shade10" d="M-8 -8h1v1z" fill="#eeeeee" stroke="#ff4949" stroke-width="1.6"/>
+<path id="shade11" d="M-8 -8h1v1z" fill="#909090" stroke="#909090" stroke-width="1"/>
+</svg>

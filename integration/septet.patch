@@ -1,0 +1,927 @@
+diff --git a/sdk/platform/opxy-1.2.1/drum_send.cpp b/sdk/platform/opxy-1.2.1/drum_send.cpp
+index e21f79e..1c20ee0 100644
+--- a/sdk/platform/opxy-1.2.1/drum_send.cpp
++++ b/sdk/platform/opxy-1.2.1/drum_send.cpp
+@@ -106,7 +106,13 @@ void sdk_drum_send_voice(const unsigned char* voice, u32 track) {
+ // 8d510ea8: stock has just scaled the sum of `track` in place by the track's
+ // gain (8d510e60..8d510e98); `gain` is where its ramp ended (R0), `step` its
+ // step per frame (R2).
++#ifdef SEPTET_PAGE
++extern "C" void septet_sum(u32) __asm__("septet_sum");
++#endif
+ void sdk_drum_send_gain(u32 track, i32 gain, i32 step) {
++#ifdef SEPTET_PAGE
++    septet_sum(track);
++#endif
+     drum_send_track_gain(sdk_drum_send_state, follow, own, raw, track, gain, step);
+ }
+ 
+diff --git a/sdk/platform/opxy-1.2.1/project_companion.cpp b/sdk/platform/opxy-1.2.1/project_companion.cpp
+index 9b0c486..2195647 100644
+--- a/sdk/platform/opxy-1.2.1/project_companion.cpp
++++ b/sdk/platform/opxy-1.2.1/project_companion.cpp
+@@ -54,6 +54,10 @@ u32 sdk_companion_reserved;
+ extern "C" unsigned m3_saved(unsigned) __asm__("m3_saved");
+ extern "C" void m3_loaded(unsigned,const opxy::u8*,unsigned) __asm__("m3_loaded");
+ #endif
++#ifdef SEPTET_PAGE
++extern "C" unsigned sept_saved(unsigned) __asm__("sept_saved");
++extern "C" void sept_loaded(unsigned,const opxy::u8*,unsigned) __asm__("sept_loaded");
++#endif
+ 
+ namespace {
+ typedef void File;
+@@ -163,6 +167,9 @@ private:
+ u32 locks_budget() {
+     const u32 kFixedBytes = 2048, kEntryBytes = 128, kLimit = 64 * 1024;
+     u32 rest = kFixedBytes;
++#ifdef SEPTET_PAGE
++    rest += 768;
++#endif
+     for (const CompanionMachine* m = sdk_companion_machines; m->id; ++m) rest += kEntryBytes;
+     return rest < kLimit ? kLimit - rest : 0;
+ }
+@@ -174,6 +181,9 @@ void write_companion(void* project, u32 bytes, u32 crc) {
+     // in order, open-xy.control leaving room for it.
+     const u32 locks = sdk_project_locks_size(project, locks_budget());
+     sdk_companion_reserved = locks;
++#ifdef SEPTET_PAGE
++    sdk_companion_reserved += 768;
++#endif
+     Writer w(file);
+     w.put("{\n  \"format\": \"open-xy-project\",\n  \"project\": {\n    \"bytes\": ");
+     w.number(bytes);
+@@ -214,6 +224,23 @@ void write_companion(void* project, u32 bytes, u32 crc) {
+     }
+     w.byte(alphabet[(bits << (6-rem)) & 63]);
+     w.put("=\"}");
++#endif
++#ifdef SEPTET_PAGE
++    {
++    w.put(",\n    \"open-xy.septet\": {\"version\":2,\"data\":\"");
++    const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
++    u32 bits = 0, rem = 0;
++    for (u32 i = 0; i < 128; ++i) {
++        const u32 settings = sept_saved(i);
++        for (u32 byte = 0; byte < 4; ++byte) {
++            bits = (bits << 8) | ((settings >> (8 * byte)) & 255);
++            rem += 8;
++            while (rem >= 6) { rem -= 6; w.byte(alphabet[(bits >> rem) & 63]); }
++        }
++    }
++    w.byte(alphabet[(bits << (6-rem)) & 63]);
++    w.put("=\"}");
++    }
+ #endif
+     if(master_processor::processor_count()) {
+         const auto controls=master_processor::current();
+@@ -851,6 +878,33 @@ bool resonator_section(Parser& p, bool& ok) {
+     return read;
+ }
+ #endif
++#ifdef SEPTET_PAGE
++opxy::u8 septet_data[512];
++u32 septet_width;
++bool septet_section(Parser& p, bool& ok) {
++    septet_width = 0;
++    ok = false;
++    if (p.peek() != '{') return p.skip();
++    u32 version = 0, count = 0;
++    bool have_version = false, data_ok = false;
++    const bool read = p.object([&](const Text& key) {
++        if (key.is("version")) return p.natural(version,have_version);
++        if (!key.is("data")) return p.skip();
++        count = 0; data_ok = false;
++        if (p.peek() != '"') return p.skip();
++        return p.base64([&](u32 byte) {
++            if (count < sizeof(septet_data)) septet_data[count] = byte;
++            ++count;
++        }, data_ok);
++    });
++    ok = have_version && version >= 1;
++    if (ok && data_ok) {
++
++        if (version == 2 && count == 512) septet_width = 4;
++    }
++    return read;
++}
++#endif
+ bool locks_ok;
+ bool locks_section(Parser& p, bool& ok) {
+     ok = locks_ok = false;
+@@ -923,6 +977,9 @@ bool read_document(File* file, u32& bytes, u32& crc, bool& applies) {
+         locks_ok = false;
+ #ifdef M3_RESONATOR
+         resonator_width = 0;
++#endif
++#ifdef SEPTET_PAGE
++        septet_width = 0;
+ #endif
+         valid = true;
+         invalid_count = 0;
+@@ -943,6 +1000,13 @@ bool read_document(File* file, u32& bytes, u32& crc, bool& applies) {
+                 if (!note_section(name,ok)) valid = false;
+                 return true;
+             }
++#endif
++#ifdef SEPTET_PAGE
++            if (name.is("open-xy.septet")) {
++                if (!septet_section(p,ok)) return false;
++                if (!note_section(name,ok)) valid = false;
++                return true;
++            }
+ #endif
+             if (name.is("open-xy.locks")) {
+                 if (!locks_section(p, ok)) return false;
+@@ -997,6 +1061,10 @@ bool apply_companion(void* project, const char* path) {
+ #ifdef M3_RESONATOR
+     if (machines_apply && resonator_width)
+         m3_loaded(static_cast<u32>(reinterpret_cast<opxy::platform::Address>(project)), resonator_data, resonator_width);
++#endif
++#ifdef SEPTET_PAGE
++    if (machines_apply && septet_width)
++        sept_loaded(static_cast<u32>(reinterpret_cast<opxy::platform::Address>(project)), septet_data, septet_width);
+ #endif
+     if(machines_apply)remap(static_cast<unsigned char*>(project));
+     if(master_applies)master_processor::loaded_state(static_cast<u32>(reinterpret_cast<opxy::platform::Address>(project)),master_state);
+@@ -1017,6 +1085,9 @@ u32 sdk_project_save(void* project, const char* path) {
+ u32 sdk_project_load(void* project, const char* path) {
+ #ifdef M3_RESONATOR
+     m3_loaded(0,nullptr,0);
++#endif
++#ifdef SEPTET_PAGE
++    sept_loaded(0,nullptr,0);
+ #endif
+     master_processor::clear_pending();
+     sdk_project_locks_begin();
+diff --git a/sdk/platform/opxy-1.2.1/screen_order.cpp.in b/sdk/platform/opxy-1.2.1/screen_order.cpp.in
+index acf0a42..73427b9 100644
+--- a/sdk/platform/opxy-1.2.1/screen_order.cpp.in
++++ b/sdk/platform/opxy-1.2.1/screen_order.cpp.in
+@@ -44,6 +44,9 @@ void sdk_morph_gui_turns_reset() __asm__("sdk_morph_gui_turns_reset");
+ void sdk_send_refresh() __asm__("sdk_send_refresh");
+ }
+ 
++#ifdef SEPTET_PAGE
++extern "C" opxy::u32 sept_setup_frame(opxy::u32) __asm__("sept_setup_frame");
++#endif
+ namespace {
+ opxy::platform::ScreenOrder<@PAGE_LIMIT@> order;
+ opxy::platform::ScreenActivation activation;
+@@ -69,6 +72,9 @@ opxy::u32 sdk_screen_next(opxy::platform::ScreenCursor* cursor, opxy::u32 select
+         const opxy::u32 page = m3_setup_frame(verified_morph_page ? 0u : selected);
+         if (page && !substitute) substitute = page;
+     }
++#endif
++#ifdef SEPTET_PAGE
++    if(first){const auto page=sept_setup_frame(verified_morph_page?0u:selected); if(!substitute)substitute=page;}
+ #endif
+     opxy::u32 more = order.advance(*cursor, selected, substitute, sdk_screen_owned, sdk_sample_screen,
+         verified_morph_page != 0u && selected == 1u);
+diff --git a/sdk/platform/opxy-1.2.1/septet.cpp.in b/sdk/platform/opxy-1.2.1/septet.cpp.in
+new file mode 100644
+index 0000000..dc8b52a
+--- /dev/null
++++ b/sdk/platform/opxy-1.2.1/septet.cpp.in
+@@ -0,0 +1,135 @@
++// OS 1.2.1 track-sum EQ. The stock filter registrar populates
++// the per-voice factory table and its name map, independently of send FX.
++#include "registration.hpp"
++// The FX build carrier has no separate authored source-unit slot.
++#include "eq.hpp"
++
++using opxy::u32;
++using opxy::i32;
++using opxy::platform::Address;
++using opxy::platform::Record;
++using opxy::platform::at;
++using opxy::platform::stock;
++
++extern "C" {
++extern const char septet_fx_factory[] __asm__("septet_fx_factory");
++extern const char septet_fx_parameter_name[] __asm__("septet_fx_parameter_name");
++int septet_fx_register() __asm__("septet_fx_register");
++int septet_ready() __asm__("septet_ready");
++void septet_filter_init(u32, const char*, const char*, const char*, u32)
++    __asm__("septet_filter_init");
++}
++
++static constexpr u32 kSeptetFilter = @SEPTET_FILTER@;
++#include "septet_ui.hpp"
++
++namespace {
++const Address kFilterRecords = 0x08039b2c;
++const u32 kRegisterFilter = 0x8d50673c;
++const u32 kStockSvf = 10;
++const u32 kStockSvfFactory = 0x8d51c058;
++const Address kStockSvfMethods = 0x8405307c;
++const u32 kStockVoiceCount = 128;
++const u32 kStockSlotBytes = 0x90;
++const unsigned kFilterControlOffset = 16;
++const u32 kInstrumentFilterPage = 3;
++const u32 kRecordWords = 12;
++const u32 kNameBytes = 32;
++
++
++using Registrar = void(u32, const char*, const char*, const char*, u32);
++
++const volatile u32* row(u32 id) {
++    return at<const volatile u32>(kFilterRecords) + id * kRecordWords;
++}
++
++bool name_matches(const volatile u32* record, const char* name, u32 size) {
++    const volatile char* field = reinterpret_cast<const volatile char*>(record + 4);
++    for (u32 i = 0; i < kNameBytes; ++i) {
++        if (field[i] != (i < size ? name[i] : 0)) return false;
++    }
++    return true;
++}
++
++bool empty(const volatile u32* record) {
++    for (u32 i = 0; i < kRecordWords; ++i) {
++        if (record[i] != 0) return false;
++    }
++    return true;
++}
++
++struct FilterObject { const void* const* methods; };
++using namespace septet_eq;
++Bank track_bank[8];
++void mono(FilterObject*, i32*, const i32*, i32, i32) {}
++void stereo(FilterObject*, i32*, const i32*, i32, i32) {}
++void reset(FilterObject*, u32) {}
++const void* const kPassThroughMethods[10] = {
++    reinterpret_cast<const void*>(0x8d51c0c2), reinterpret_cast<const void*>(0x8d51c0d8),
++    reinterpret_cast<const void*>(&mono), reinterpret_cast<const void*>(&stereo),
++    reinterpret_cast<const void*>(0x8d5006a4), reinterpret_cast<const void*>(&reset),
++    reinterpret_cast<const void*>(0x8d51bc20), reinterpret_cast<const void*>(0x8d500684),
++    nullptr, nullptr
++};
++
++void* septet_factory(u32 index, u32 track) {
++    if (index >= kStockVoiceCount) return nullptr;
++    auto object = stock<FilterObject*(u32, u32)>(kStockSvfFactory)(index, track);
++    if (object && object->methods == at<const void* const>(kStockSvfMethods)) {
++        object->methods = kPassThroughMethods;
++        reset(object, 0);
++    }
++    return object;
++}
++
++const char kFilterName[] = "septet";
++}
++
++int septet_ready() {
++    const volatile u32* svf = row(kStockSvf);
++    const volatile u32* probe = row(kSeptetFilter);
++    return svf[0] == kStockSvfFactory &&
++           probe[0] == reinterpret_cast<Address>(septet_factory) &&
++           probe[1] == reinterpret_cast<Address>(septet_fx_parameter_name) &&
++           probe[3] == svf[3] && name_matches(probe, kFilterName, sizeof(kFilterName)-1);
++}
++
++int septet_fx_register() {
++    const Record record = {septet_fx_factory, septet_fx_parameter_name, kFilterName,
++                           at<const char>(kSeptetFilter), at<const char>(kInstrumentFilterPage), 0};
++    return sdk_register_effect(&record) > 0;
++}
++
++void septet_filter_init(u32 id, const char* name, const char* factory,
++                         const char* parameters, u32 page) {
++    const auto register_filter = stock<Registrar>(kRegisterFilter);
++    // Reproduce the final stock registration (Dynamic) with its original ABI.
++
++#ifdef M3_RESONATOR
++    extern void install_trine(u32,const char*,const char*,const char*,u32) __asm__("m3probe_filter_init");
++    install_trine(id,name,factory,parameters,page);
++#else
++    register_filter(id,name,factory,parameters,page);
++#endif
++
++    const volatile u32* svf = row(kStockSvf);
++    if (svf[0] != kStockSvfFactory ||
++        !name_matches(svf, "svf", 3)) return;
++    if (empty(row(kSeptetFilter))) {
++        register_filter(kSeptetFilter, kFilterName, reinterpret_cast<const char*>(septet_factory),
++                        septet_fx_parameter_name, svf[3]);
++    }
++}
++
++extern "C" void septet_sum(u32) __asm__("septet_sum");
++void septet_sum(u32 track) {
++    if(track>=8)return;
++    auto& bank=track_bank[track];
++    if(!at<const volatile unsigned char>(0x11b01dc8)[track] ||
++       at<const volatile u32>(0x84042700)[track]!=kSeptetFilter){
++        if(bank.started)bank={};
++        return;
++    }
++    const auto words=at<const i32>(0x84eab39c+0xe8*track)+kFilterControlOffset;
++    septet_eq::process(bank,septet_eq::controls(words,sept_ui::audio[track]),at<i32>(0x11903600),64);
++}
+diff --git a/sdk/platform/opxy-1.2.1/septet_sum_hook.s b/sdk/platform/opxy-1.2.1/septet_sum_hook.s
+new file mode 100644
+index 0000000..34d4c9d
+--- /dev/null
++++ b/sdk/platform/opxy-1.2.1/septet_sum_hook.s
+@@ -0,0 +1,15 @@
++/* Same reviewed mixer boundary as sdk_drum_send_gain_hook, stock OS 1.2.1. */
++.include "sdk/platform/opxy-1.2.1/hook.inc"
++.section .text
++.align 2
++.global septet_sum_hook
++.type septet_sum_hook, STT_FUNC
++septet_sum_hook:
++    HOOK_SAVE
++    P0 = [FP];
++    R0 = [P0 + 8];
++    CALL septet_sum;
++    HOOK_RESTORE
++    P2.H = 0x1190; P2.L = 0x3600;
++    RTS;
++.size septet_sum_hook, .-septet_sum_hook
+diff --git a/sdk/platform/opxy-1.2.1/septet_ui.hpp b/sdk/platform/opxy-1.2.1/septet_ui.hpp
+new file mode 100644
+index 0000000..84fdb7b
+--- /dev/null
++++ b/sdk/platform/opxy-1.2.1/septet_ui.hpp
+@@ -0,0 +1,375 @@
++// Included in the generated registration translation unit for this isolated build.
++#include "screen.hpp"
++#include "settings.hpp"
++#include "graph_paths.hpp"
++namespace sept_ui {
++using namespace opxy;
++using namespace opxy::platform;
++using namespace septet_eq;
++constexpr u32 tracks = 8, patterns = 16, slots = tracks * patterns;
++constexpr u32 pattern_bytes = 0x53f4, track_bytes = 0x53f44;
++constexpr u32 clipboard = 0x84ffd208, private_message = 128;
++constexpr u32 gui_project = 0x86bd027c;
++constexpr u32 main_page = SEPTET_PAGE;
++constexpr u32 initial_settings = 0;
++struct Settings { u32 word[slots]; };
++Settings saved, pending;
++u32 pending_project, menu_pattern, last_sent[tracks];
++u32 render_page;
++bool sent[tracks];
++u32 copied;
++u32 audio[tracks];
++u32 active() { return word(0x840a0524); }
++u32 pattern_for(u32 t) { return stock<u32(u32)>(0x8d587708)(t); }
++int index_of(u32 project, u32 pointer) {
++    if (!project || pointer < project + 0xd7c) return -1;
++    const u32 offset = pointer - project - 0xd7c;
++    if (offset >= tracks * track_bytes) return -1;
++    const u32 track = offset / track_bytes, within = offset % track_bytes;
++    if (within % pattern_bytes || within >= patterns * pattern_bytes) return -1;
++    return int(track * patterns + within / pattern_bytes);
++}
++bool context(u32 track) {
++    if (track >= tracks || track != byte(kSelectedTrack) || word(0x080238bc) != 2 || word(kScreen) != 0) return false;
++    auto controller = stock<const u32*()>(0x8c0944b0)();
++    return controller && *controller == 0x8400dff8 && stock<u32(u32)>(0x8d5878d4)(track) == kSeptetFilter;
++}
++bool plain() { return !stock<u32(u32)>(0x8d5b7d7c)(14u + byte(kSelectedTrack)) && !shift_held() && !stock<u32()>(0x8d5b7e34)(); }
++void send(u32 track, u32 value) {
++    if (!sent[track] || last_sent[track] != value) {
++        stock<void(u32,i32)>(0x8d4dc84c)(private_message, i32(0x80000000u | (track << setup_bits) | value));
++        sent[track] = true;
++        last_sent[track] = value;
++    }
++}
++void publish_track(u32 project,u32 track) {
++    const u32 playing = stock<u32(u32)>(0x8d586014)(track);
++    const int slot = index_of(project, playing);
++    if (slot >= 0) send(track, saved.word[slot]);
++}
++void refresh() {
++    const u32 project = active();
++    if (!project || word(0x840a0528)) return;
++    for (u32 t = 0; t < tracks; ++t) publish_track(project,t);
++}
++bool menu(u32 t) {
++    if (menu_pattern && (!context(t) || menu_pattern != pattern_for(t))) menu_pattern = 0;
++    return menu_pattern != 0;
++}
++namespace {
++using namespace opxy::screen;
++using namespace septet_graph;
++struct Renderer {
++    struct Path {
++        PathNode* node;
++        u32 begin;
++
++        Command* commands(unsigned count) const {
++            if (!node) return nullptr;
++            const auto& v=node->commands;
++            if (!ordered(v) || (v.begin&3) || v.end-v.begin!=count*sizeof(Command)) return nullptr;
++            return reinterpret_cast<Command*>(v.begin);
++        }
++        void bind(PathNode* leaf,unsigned count) {
++            node=leaf;
++            const auto* data=commands(count);
++            if (data && valid_polygon(data,count)) begin=node->commands.begin;
++        }
++        void paint(const int* y,unsigned count,int inset) const {
++            if (!begin || node->commands.begin!=begin) return;
++            auto* data=commands(count);
++            if (!data) return;
++            if (count==ribbon_commands) write_ribbon(data,y,inset);
++            else write_contour(data,y,inset);
++            invalidate(node);
++        }
++    };
++    struct Object {
++        Base base;
++        Path curve,area,secondary;
++        PathNode *dot[7],*icon[9],*handle,*sweep_dot;
++        u16 palette[12], dot_stroke[2];
++        septet_eq::Controls last;
++        u32 bank,initialized;
++    };
++    static PathNode* node(Object* o,const char* name){return path_node(find(&o->base,name));}
++    static PathNode* indexed(Object* o,const char* prefix,unsigned n) {
++        char id[12];char* p=id;
++        while(*prefix)*p++=*prefix++;
++        if(n>=10)*p++='1';
++        *p++=char('0'+n%10);*p=0;
++        return node(o,id);
++    }
++    static void init(Object* o) {
++        clear(o); if(!o->base.svg)return;
++        o->curve.bind(node(o,"curve"),ribbon_commands);
++        o->area.bind(node(o,"fillcurve"),contour_commands);
++        o->secondary.bind(node(o,"secondary"),ribbon_commands);
++        o->sweep_dot=node(o,"sweep_dot");
++        o->handle=node(o,"handle");
++        for(unsigned i=0;i<7;++i)o->dot[i]=indexed(o,"dot",i);
++        for(unsigned i=0;i<9;++i)o->icon[i]=indexed(o,"icon",i);
++        for(unsigned i=0;i<12;++i){
++            auto p=indexed(o,"shade",i);
++            if(!p)continue;
++            o->palette[i]=p->fill;
++            if(i>=10)o->dot_stroke[i-10]=palette_ids(p,o->base.svg)>>16;
++        }
++    }
++    static void move(PathNode* p,int x,int y){
++        const u32 indices[]={6,7};const i32 pose[]={x*1024,y*1024};
++        if(p)set_words(&p->leaf,indices,pose);
++    }
++    static void shade(PathNode* p,u16 color){
++        if(p && color && p->fill!=color){set_fill(p,color);invalidate(p);}
++    }
++    static void place_mode(Object* o,Mode mode,int shift) {
++        const unsigned a=3+2*unsigned(mode);
++        move(o->icon[mode],47+shift,197);
++        move(o->icon[a],168+shift,197);
++        move(o->icon[a+1],449+shift,197);
++    }
++    static void frame(Object* o,i32) {
++        if(!render_page || !o->base.svg)return;
++        u32 t=byte(kSelectedTrack);
++        const u32 pattern=pattern_for(t);
++        const int slot=index_of(active(),pattern);
++        if(slot<0)return;
++        const bool upper=menu_pattern==pattern;
++        i32 words[4];
++        for(unsigned i=0;i<4;++i)
++            words[i]=stock<i32(u32,u32,u32,u32)>(0x8d5ac9dc)(gui_project,t,16+i,1);
++        const auto p=controls(words,saved.word[slot]);
++        const bool first=!o->initialized;
++        const bool mode_changed=first || p.mode!=o->last.mode;
++        const bool sweep_changed=first || p.sweep!=o->last.sweep;
++        bool plot_changed=mode_changed || sweep_q12(p.sweep)!=sweep_q12(o->last.sweep);
++        const bool bank_changed=first || o->bank!=unsigned(upper);
++        for(unsigned i=0;i<7;++i){
++            const bool gain_changed=first || p.gain[i]!=o->last.gain[i];
++            if(gain_changed){
++                plot_changed=true;
++                move(o->dot[i],px[dot_index[i]],69-4*p.gain[i]);
++            }
++            if(gain_changed || bank_changed){
++                const unsigned dim=(i>=3)!=upper;
++                const u32 fill=o->palette[p.gain[i]==0 ? 9 : 10+dim];
++                const u32 stroke=o->dot_stroke[dim];
++                if(fill && stroke) paint(o->dot[i],fill | (stroke<<16),true);
++            }
++        }
++        if(plot_changed){
++            int side[points],middle[points];
++            plot(p,side,middle);
++            const bool mid_primary=p.mode==MidSide && p.sweep<16384;
++            const int* primary=mid_primary ? middle : side;
++            o->curve.paint(primary,ribbon_commands,1);
++            o->area.paint(primary,contour_commands,1);
++            if(p.mode==MidSide)
++                o->secondary.paint(mid_primary ? side : middle,ribbon_commands,0);
++        }
++        if(mode_changed){
++            if(p.mode!=o->last.mode) place_mode(o,o->last.mode,-550);
++            place_mode(o,p.mode,0);
++            move(o->secondary.node,p.mode==MidSide ? 0 : -480,0);
++        }
++        if(mode_changed || sweep_changed){
++            const unsigned a=3+2*unsigned(p.mode),light=(p.sweep+2048)>>12;
++            shade(o->icon[a],o->palette[8-light]);
++            shade(o->icon[a+1],o->palette[light]);
++            move(o->handle,190+(235*p.sweep+16384)/32768,197);
++        }
++        if(bank_changed){
++            move(o->sweep_dot,upper ? -480 : 22,197);
++            shade(o->handle,o->palette[upper ? 11 : 10]);
++            o->bank=upper;
++        }
++        o->initialized=1;
++        o->last=p;
++        draw(&o->base);
++    }
++};
++}
++}
++OPXY_SCREEN(sept_ui::Renderer,"septet","septet.svg",256,244)
++namespace sept_ui {
++const Record screen_record={nullptr,nullptr,"septet",reinterpret_cast<const char*>(kSeptetFilter),reinterpret_cast<const char*>(SEPTET_PAGE),0};
++const Screen main_screen={reinterpret_cast<char*>(&opxy_screen_state),sizeof(opxy_screen_state),
++    reinterpret_cast<const char*>(&opxy_screen_vtable),opxy_screen_asset,
++    reinterpret_cast<char*(*)(char*,u32)>(&opxy_screen_ctor)};
++}
++extern "C" {
++int sept_setup_register() __asm__("sept_setup_register");
++u32 sept_setup_frame(u32) __asm__("sept_setup_frame");
++u32 sept_setup_click(u32,u32,u32) __asm__("sept_setup_click");
++u32 m3_stock_click(u32,u32,u32) __asm__("m3_stock_click");
++int sept_setup_turn(u32,u32,u32) __asm__("sept_setup_turn");
++void sept_receive(u32,u32,i32) __asm__("sept_receive");
++u32 sept_step(u32,u32,u32) __asm__("sept_step");
++u32 sept_step_base(u32,u32,u32) __asm__("sept_step_base");
++u32 sept_stock_step(u32,u32,u32) __asm__("sept_stock_step");
++u32 sept_project() __asm__("sept_project");
++void sept_new() __asm__("sept_new");
++void m3_stock_new() __asm__("m3_stock_new");
++void* sept_copy(void*,const void*,u32) __asm__("sept_copy");
++}
++#ifdef M3_RESONATOR
++extern "C" {
++u32 tr_click(u32,u32,u32) __asm__("m3_setup_click");
++void tr_receive(u32,u32,i32) __asm__("m3_receive");
++u32 tr_step(u32,u32,u32) __asm__("m3_step");
++u32 tr_project() __asm__("m3_project");
++void tr_new() __asm__("m3_new");
++void* tr_copy(void*,const void*,u32) __asm__("m3_copy");
++}
++#endif
++int sept_setup_register() {
++    return sdk_register_screen(&sept_ui::screen_record,&sept_ui::main_screen);
++}
++u32 sept_setup_frame(u32 selected) {
++    using namespace sept_ui;
++    render_page = 0;
++    const u32 track = opxy::platform::byte(opxy::platform::kSelectedTrack);
++    if (selected != 3 || !context(track) || !plain()) {
++        menu_pattern = 0;
++        return 0;
++    }
++    publish_track(active(),track);
++    menu(track);
++    if (sdk_screen_ready(&screen_record, &main_screen)) render_page = main_page;
++    return render_page;
++}
++namespace sept_ui {
++bool change(u32 track, int slot, u32 next) {
++    if (next == saved.word[slot]) return false;
++    saved.word[slot] = next;
++    publish_track(active(),track);
++    stock<void()>(0x8d585ee8)();
++    return true;
++}
++}
++u32 sept_setup_click(u32 track,u32 key,u32 controller) {
++    using namespace sept_ui;
++    if (key >= 11 && key <= 13 && context(track) && plain()
++            && sdk_screen_ready(&screen_record, &main_screen)) {
++        const u32 pattern = pattern_for(track);
++        const int slot = index_of(active(), pattern);
++        if (slot >= 0 && key == 11) {
++            menu_pattern = menu_pattern == pattern ? 0 : pattern;
++            return 0;
++        }
++        if (slot >= 0 && key == 12) {
++            // Stock gain words are bipolar around half scale. Word 19 is the sweep.
++            for (u32 index = 16; index < 19; ++index)
++                set_parameter(gui_project, track, index, 0x40000000);
++            if (!change(track, slot, saved.word[slot] & ~extra_gain_mask))
++                stock<void()>(0x8d585ee8)();
++            return 0;
++        }
++        if (slot >= 0 && key == 13 && !menu(track)) {
++            change(track,slot,cycle(saved.word[slot]));
++            return 0;
++        }
++    }
++
++#ifdef M3_RESONATOR
++    return tr_click(track,key,controller);
++#else
++    return m3_stock_click(track,key,controller);
++#endif
++
++}
++int sept_setup_turn(u32 track,u32 index,u32 event) {
++    using namespace sept_ui;
++    if (index < 16 || index > 19 || !menu(track) || !plain()) return -1;
++    const int slot = index_of(active(), menu_pattern);
++    if (slot < 0 || !event) return 0;
++    return change(track,slot,edit(saved.word[slot], index-16, at<const i32>(event)[1]));
++}
++void sept_receive(u32 base,u32 id,i32 value) {
++    using namespace sept_ui;
++    if (id != private_message || !(u32(value)&0x80000000u)) {
++#ifdef M3_RESONATOR
++    tr_receive(base,id,value);
++#else
++    stock<void(u32,u32,i32)>(0x8d50eb8c)(base,id,value);
++#endif
++        return;
++    }
++    const u32 t = (u32(value) & 0x7fffffffu) >> setup_bits, settings = u32(value) & setup_mask;
++    if (t < tracks && valid_setup(settings)) audio[t] = settings;
++}
++u32 sept_stock_step(u32 project,u32 track,u32 position) {
++    return stock<u32(u32,u32,u32)>(0x8d5936c0)(project,track,position);
++}
++u32 sept_step(u32 project,u32 track,u32 position) {
++
++#ifdef M3_RESONATOR
++    const u32 result = tr_step(project,track,position);
++#else
++    const u32 result = sept_step_base(project,track,position);
++#endif
++
++    if (track < sept_ui::tracks) sept_ui::publish_track(sept_ui::active(),track);
++    return result;
++}
++u32 sept_project() {
++    using namespace sept_ui;
++
++#ifdef M3_RESONATOR
++    const u32 project = tr_project();
++#else
++    const u32 project = stock<u32()>(0x8d584210)();
++#endif
++
++    if (project && project == pending_project) saved = pending;
++    else for (u32 i = 0; i < slots; ++i) saved.word[i] = initial_settings;
++    pending_project = menu_pattern = 0;
++    for (u32 t = 0; t < tracks; ++t) sent[t] = false;
++    refresh();
++    return project;
++}
++void sept_new() { sept_ui::pending_project = 0;
++#ifdef M3_RESONATOR
++    tr_new();
++#else
++    m3_stock_new();
++#endif
++}
++void* sept_copy(void* dst, const void* src, u32 bytes) {
++    using namespace sept_ui;
++    const u32 to = reinterpret_cast<Address>(dst), from = reinterpret_cast<Address>(src);
++    if (bytes == pattern_bytes) {
++        const u32 project = active();
++        const int a = index_of(project, from), b = index_of(project, to);
++        const u32 setting = a >= 0 ? saved.word[a] : from == clipboard ? copied : initial_settings;
++        if (to == clipboard) copied = setting;
++        if (b >= 0) saved.word[b] = setting;
++    }
++
++#ifdef M3_RESONATOR
++    return tr_copy(dst,src,bytes);
++#else
++    return stock<void*(void*,const void*,u32)>(0x040201c4)(dst,src,bytes);
++#endif
++
++}
++// Companion callbacks execute on the GUI role. Restore is staged until stock
++// publishes the deserialized project buffer.
++extern "C" {
++unsigned sept_saved(unsigned) __asm__("sept_saved");
++void sept_loaded(unsigned, const opxy::u8*, unsigned) __asm__("sept_loaded");
++}
++unsigned sept_saved(unsigned i) { return i < sept_ui::slots ? sept_ui::saved.word[i] : 0; }
++void sept_loaded(unsigned project, const opxy::u8* bytes, unsigned width) {
++    sept_ui::pending_project = project;
++    for (unsigned i = 0; i < sept_ui::slots; ++i) {
++        unsigned word = 0;
++        if (!bytes || !width) word = sept_ui::initial_settings;
++        if (bytes && (width == 2 || width == 4))
++            for (unsigned j = 0; j < width; ++j)
++                word |= unsigned(bytes[i * width + j]) << (8 * j);
++
++        sept_ui::pending.word[i] = septet_eq::valid_setup(word) ? word : 0;
++    }
++}
+diff --git a/sdk/platform/opxy-1.2.1/synth_controls.cpp b/sdk/platform/opxy-1.2.1/synth_controls.cpp
+index 7fb4dee..d47f715 100644
+--- a/sdk/platform/opxy-1.2.1/synth_controls.cpp
++++ b/sdk/platform/opxy-1.2.1/synth_controls.cpp
+@@ -490,6 +490,9 @@ u32 sdk_param_steps(u32 track, u32 index, u32* scale) {
+ #ifdef M3_RESONATOR
+ extern "C" int m3_setup_turn(u32,u32,u32) __asm__("m3_setup_turn");
+ #endif
++#ifdef SEPTET_PAGE
++extern "C" int sept_setup_turn(u32,u32,u32) __asm__("sept_setup_turn");
++#endif
+ u32 sdk_synth_turn(u32 project, u32 track, u32 index, u32 event) {
+     if (event && sdk_morph_hud_turn_suppress && sdk_morph_hud_turn_suppress(track)) {
+         const opxy::i32 still[3]={0,0,0};
+@@ -499,6 +502,10 @@ u32 sdk_synth_turn(u32 project, u32 track, u32 index, u32 event) {
+ #ifdef M3_RESONATOR
+     const int handled = m3_setup_turn(track,index,event);
+     if (handled >= 0) return static_cast<u32>(handled);
++#endif
++#ifdef SEPTET_PAGE
++    const int sept=sept_setup_turn(track,index,event);
++    if(sept>=0)return static_cast<u32>(sept);
+ #endif
+     Track* t;
+     // The instrument controller maps Shift's engine-page row to slots 4..7.
+diff --git a/tooling/adapters.py b/tooling/adapters.py
+index c9064bc..e4ec65a 100644
+--- a/tooling/adapters.py
++++ b/tooling/adapters.py
+@@ -354,6 +354,9 @@ def generate_registration(directory, m):
+         require(m.kind == 'effect' and m.display == 'stock' and m.identity['effect'] == 11,
+                 'M3 probe needs ID 11 from the isolated layout')
+         return expand('m3_probe.cpp.in', RELOCATED, Path(directory) / 'registration.cpp')
++    if m.id == "septet":
++        from .septet_support import filter_id
++        return expand("septet.cpp.in", dict(RELOCATED, SEPTET_FILTER=filter_id(m)), Path(directory) / "registration.cpp")
+     p, effect = m.prefix, m.kind == 'effect'
+     name = m.native_name.encode('ascii')
+     require(1 <= len(name) <= 15 and b'\0' not in name, 'Unsupported inline engine name')
+diff --git a/tooling/native.py b/tooling/native.py
+index ae74186..b6a2391 100644
+--- a/tooling/native.py
++++ b/tooling/native.py
+@@ -175,6 +175,9 @@ def configuration(entries=None, layout=None):
+         if copies.exists():
+             profile['patches'].extend(json.loads(copies.read_text()))
+         check_patch_boundaries(profile, len(profile['patches']))
++    if any(m.id == "septet" for m in machines):
++        from .septet_support import configure
++        configure(profile, machines, layout, has_probe)
+     definitions = dict(DEFINITIONS)
+     for m in machines:
+         if m.kind == 'player':
+@@ -290,6 +293,8 @@ def plan(machines, profile=None):
+     units += [(f'sdk/{step}.o', None, step) for step in SDK_UNITS
+               if UNIT_SERVICES.get(step) is None or UNIT_SERVICES[step] in services]
+     units += [(f'sdk/extension_{e.id}.o', None, 'extension:' + e.id) for e in linked_extensions(machines)]
++    if any(m.id == "septet" for m in machines):
++        units.append(("sdk/septet_sum_hook.o",None,"septet_sum_hook"))
+     names = [name for name, _m, _step in units]
+     require(len(names) == len(set(names)), 'Duplicate object name')
+     return units
+@@ -529,6 +534,8 @@ def link(directory, tools, profile, definitions, machines, selected, name='modul
+     # Entry points of services the whole collection's shared objects (startup's
+     # included) call into but this selection doesn't link, as the builder resolves them.
+     used = active_services(profile, service_users(chosen))
++    if any(m.id == 'septet' for m in chosen):
++        aliases['sept_step_base'] = 'sdk_lock_step' if 'drum_locks' in used else 'sept_stock_step'
+     if any(m.id == 'm3probe' for m in chosen):
+         # Resolve the wrapper against this link's actual selection, including fit links.
+         aliases['m3_step_base'] = trine_step_target(used)
+@@ -607,6 +614,9 @@ def compile_collection(directory, toolchain, compiler, profile, machines, defini
+     def cxx(source, obj, m=None):
+         compile_cxx(gcc['cxx'], tools['as'], source, obj, includes(m), trine_defines)
+ 
++    if "septet_page" in profile:
++        trine_defines.append("-DSEPTET_PAGE=" + str(profile["septet_page"]))
++
+     def display_unit(folder, m):
+         generate_display(folder, machine=m)
+         return folder / 'display_binding.cpp'
+@@ -1168,6 +1178,8 @@ def extend_catalog(catalog, profile, machines):
+     listed = [m for m in machines if catalog_entry(m)]  # aux machines are not in tracks 1-8's list
+     probes = [m for m in listed if m.id == 'm3probe']
+     listed = [m for m in listed if m.id != 'm3probe']
++    septets = [m for m in listed if m.id == "septet"]
++    listed = [m for m in listed if m.id != "septet"]
+     groups = dict(engine_types=by_kind(listed, 'synth', 'drum', 'sample'), fx_types=by_kind(listed, 'effect'),
+                   seq_types=by_kind(listed, 'player'))
+     result, base = catalog, json.loads(catalog)
+@@ -1188,6 +1200,17 @@ def extend_catalog(catalog, profile, machines):
+         at = start + end - 1
+         result = result[:at] + b''.join(b', ' + json.dumps(row).encode('ascii') for row in rows) + result[at:]
+         added['filter_types'] = rows
++    if septets:
++        from .septet_support import filter_id
++        slot = filter_id(septets[0])
++        row = dict(type="septet", id=slot, default_params=catalog_defaults(septets[0].definition))
++        original = json.loads(result)
++        require(all(x["id"] != slot for k in ("fx_types","filter_types") for x in original[k]), f"Septet filter ID {slot} is occupied")
++        start = result.index(b"[", result.index(b'"filter_types"'))
++        _, end = json.JSONDecoder().raw_decode(result[start:].decode("ascii"))
++        at = start + end - 1
++        result = result[:at] + b", " + json.dumps(row).encode("ascii") + result[at:]
++        added.setdefault("filter_types", []).append(row)
+     require(json.loads(result) == dict(base, **{key: base[key] + entries for key, entries in added.items()}),
+             'Unexpected catalog modification')
+     return result
+@@ -1197,6 +1220,8 @@ def prepare_assets(catalog, profile, machines):
+     require(sha(catalog) == profile['stock_catalog_sha256'], 'Stock catalog hash mismatch')
+     outputs = {'content/op1_factory.json': extend_catalog(catalog, profile, machines)}
+     for machine in machines:
++        if machine.id == 'septet':
++            outputs['content/display/septet.svg'] = Path(machine.source('septet.svg')).read_bytes()
+         if machine.id == 'm3probe':
+             for artwork in ('m3_main.svg', 'm3_setup.svg'):
+                 outputs[f'content/display/{artwork}'] = Path(machine.source(artwork)).read_bytes()
+@@ -1408,7 +1433,7 @@ def main(argv=None, command=None):
+         # A package records the collection it was built from.
+         entries = package_collection(args.package) if command == 'verify' else selected_collection(args)
+         if command == 'build' and any(Path(m).resolve().joinpath('definition.json').is_file()
+-                                      and json.loads((Path(m)/'definition.json').read_text()).get('id') == 'm3probe'
++                                      and json.loads((Path(m)/'definition.json').read_text()).get('id') in ('m3probe','septet')
+                                       for m in args.machine):
+             from .m3_copy_sites import prepare
+             prepare(ROOT, args.stock_os)
+diff --git a/tooling/septet_support.py b/tooling/septet_support.py
+new file mode 100644
+index 0000000..4fc4160
+--- /dev/null
++++ b/tooling/septet_support.py
+@@ -0,0 +1,58 @@
++"""Compose Septet's filter registration and mixer service with the selected M3 machines."""
++import json
++from .formats import require
++
++def filter_id(machine):
++    # An rc1 layout with carrier 8 keeps its project-visible filter identity.
++    # For all other carriers use a filter-only row: 7 is below the stock
++    # setter bound and outside the SDK send-effect pool on OS 1.2.1.
++    return 8 if machine.identity['effect'] == 8 else 7
++
++
++def configure(profile, machines, layout, trine):
++    from .native import ROOT, FIXED_NUMBERS, active_services, bundle_page_claims, check_patch_boundaries, service_users
++    rules = profile['identities']
++    owners = [m for m in machines if m.id == 'septet']
++    require(len(owners) == 1, 'Expected one Septet machine')
++    slot = filter_id(owners[0])
++    require(slot == 8 or slot not in rules['effects'], 'Septet filter-only slot overlaps the SDK effect pool')
++    for machine in machines:
++        if machine.id == 'septet':
++            continue
++        require(machine.identity.get('effect') != slot, f'{machine.id} already occupies Septet filter {slot}')
++        for parent in (machine.root, *machine.root.parents):
++            manifest = parent / 'machine-bundle.json'
++            if manifest.is_file():
++                bundle = json.loads(manifest.read_bytes())
++                if bundle.get('id') == machine.id and parent / bundle.get('machine', '') == machine.root:
++                    require(f'filter:{slot}' not in bundle.get('claims', []),
++                            f'{machine.id} and Septet both require instrument filter {slot}')
++                    break
++    reserved = {v['page'] for v in [*FIXED_NUMBERS.values(), *(layout or {}).values()]}
++    reserved.update(m.identity['page'] for m in machines)
++    reserved.update(profile.get('m3_display_pages', {}).values())
++    reserved.update(bundle_page_claims(machines,rules['pages']))
++    free = [p for p in range(rules['pages']-2,rules['page_none'],-1) if p not in reserved]
++    require(free,'Septet needs one free display page')
++    profile['septet_page'] = free[0]
++    services = active_services(profile, service_users(machines))
++    require('master_filter' not in services,'Septet and the master processor both use receiver message 128')
++    if not trine:
++        profile['patches'].extend([
++            dict(kind='hook',address='0x8d506c3e',file_offset='0x13de9a',length=4,before='ffe37ffd',symbol='m3probe_filter_init',call=True),
++            dict(kind='hook',address='0x8c0b2a6c',file_offset='0xe9ca8',length=8,before='00e80200e505866f',symbol='m3_setup_click',call=False)])
++        copies = ROOT/'m3-copy-sites.json'
++        if copies.exists():
++            profile['patches'].extend(json.loads(copies.read_text()))
++    dispatch = {'m3probe_filter_init':'septet_filter_init','m3_setup_click':'sept_setup_click',
++                'sdk_master_receive':'sept_receive','m3_receive':'sept_receive',
++                'sdk_master_project':'sept_project','m3_project':'sept_project',
++                'sdk_project_new':'sept_new','m3_new':'sept_new','m3_step':'sept_step',
++                'sdk_lock_step':'sept_step','m3_copy':'sept_copy'}
++    if 'drum_sends' not in services:
++        dispatch['sdk_drum_send_gain_hook']='septet_sum_hook'
++    for patch in profile['patches']:
++        if patch.get('symbol') in dispatch:
++            patch['symbol']=dispatch[patch['symbol']]
++            patch.pop('service',None)
++    check_patch_boundaries(profile,len(profile['patches']))
+diff --git a/tooling/startup.py b/tooling/startup.py
+index c5ebdec..cce1be9 100644
+--- a/tooling/startup.py
++++ b/tooling/startup.py
+@@ -75,6 +75,9 @@ def render(prefixes, effects=(), stock_page=(), sample_screens=(), effect_screen
+     # An effect is registered on both roles already; its page, which its record
+     # names, is ready once its screen is in place.
+     screens = [f'    {prefix}_screen_register();' for prefix in effect_screens]
++    if 'septet' in effects:
++        declarations.append(_declare('sept_setup_register'))
++        screens.append('    sept_setup_register();')
+     if 'm3probe' in effects:
+         declarations.append(_declare('m3_setup_register'))
+         screens.append('    m3_setup_register();')
