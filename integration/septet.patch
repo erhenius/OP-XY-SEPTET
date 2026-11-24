@@ -774,9 +774,7 @@ index ae74186..b6a2391 100644
      definitions = dict(DEFINITIONS)
      for m in machines:
          if m.kind == 'player':
-@@ -290,6 +293,8 @@ def plan(machines, profile=None):
-     units += [(f'sdk/{step}.o', None, step) for step in SDK_UNITS
-               if UNIT_SERVICES.get(step) is None or UNIT_SERVICES[step] in services]
+@@ -313,4 +316,6 @@ def plan(machines, profile=None):
      units += [(f'sdk/extension_{e.id}.o', None, 'extension:' + e.id) for e in linked_extensions(machines)]
 +    if any(m.id == "septet" for m in machines):
 +        units.append(("sdk/septet_sum_hook.o",None,"septet_sum_hook"))

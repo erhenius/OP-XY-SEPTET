@@ -1,6 +1,6 @@
 # Septet
 
-Septet is a seven-band stereo graphic EQ for an OP-XY instrument track. It runs once on the track sum and follows the M3 filter switch. Septet 0.1.0 targets OP-XY OS 1.2.1 with Open-XY v0.0.7.
+Septet is a seven-band stereo graphic EQ for an OP-XY instrument track. It runs once on the track sum and follows the M3 filter switch. Septet 0.1.2 targets OP-XY OS 1.2.1 with Open-XY API 1.17.
 
 ![Septet M3 showcase showing gain edits, bank switching, the K4 sweep, and the K3 reset](docs/Septet-Showcase.gif)
 
@@ -8,8 +8,8 @@ Septet is a seven-band stereo graphic EQ for an OP-XY instrument track. It runs 
 
 ## Install
 
-1. In **TE Builder 0.5.7**, choose **File → Import Git Repository…** and paste the repository’s HTTPS clone URL. For an offline import, use **File → Import Machine ZIP…** with [Septet-0.1.0.zip](release/Septet-0.1.0.zip).
-2. Queue **Septet 0.1.0** in **Available**, then build and stage for your XY.
+1. In **TE Builder**, choose **File → Import Machine ZIP…** and open **Septet-0.1.2.zip**.
+2. Queue **Septet 0.1.2** in **Available**, then build and stage for your XY.
 3. On the XY, choose **septet** in the instrument filter picker and open M3.
 
 See [Building from source](docs/BUILDING.md) for the standalone Open-XY build and the exact SDK revision.
@@ -38,4 +38,4 @@ The main and second bank share the M3 display. Each dot shows its band’s gain 
 
 The repository and ZIP include the Septet integration and shared Morph/Trine SDK patches. Morph and Trine themselves are optional machines. Morph gui2d22 can address the four main filter parameters and displays Septet with its generic filter HUD. Septet supports layouts with Grainfield, including ones where Grainfield already occupies effect slot 8.
 
-Septet 0.1.0 uses the same DSP, display and integration as the hardware-tested RC6. See [LICENSE](LICENSE) and [component licenses](LICENSES/) for redistribution terms.
+Septet 0.1.2 adds a stereo track insert for drum filter selection. Its seven-band EQ still runs once on the track sum. See [LICENSE](LICENSE) and [component licenses](LICENSES/) for redistribution terms.

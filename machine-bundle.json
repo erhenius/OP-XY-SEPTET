@@ -3,7 +3,7 @@
   "name": "Septet",
   "id": "septet",
   "mode": "combined",
-  "sdkCommit": "28dd1a2e36599108c5eecf1a03f3b28601e50b39",
+  "sdkCommit": "ca122f4062f08f13a3023904620a4c35ff9b4a45",
   "machine": "septet",
   "claims": [
     "filter:7",
@@ -28,7 +28,15 @@
     },
     {
       "path": "integration/septet.patch",
-      "sha256": "0a963a21d44cd09a18b9b982b6235c48aef24b969e94e031fbf0972bf43eee26"
+      "sha256": "f6e3a2a40df21e7798a7c125a6ffd5a21a8438d70de57d88d3122b631dab474e"
+    },
+    {
+      "path": "integration/filter-track-insert.patch",
+      "sha256": "40a0da1aced89ccccd213021a02db9f648c66fb00292cafe1c261fe08ce9388e"
+    },
+    {
+      "path": "integration/septet-drum-insert.patch",
+      "sha256": "65702c3fa1f8a4d1eb3061395d71454f0b46760817a204447c0322c3753e9902"
     }
   ]
 }
